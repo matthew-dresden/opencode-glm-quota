@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.4] - 2026-10-16
+
+### Maintenance
+
+- clear R17 orphan references; release pipeline owns lockfile version (#5)
+
 ## [1.8.3] - 2026-10-16
 
 ### Maintenance
