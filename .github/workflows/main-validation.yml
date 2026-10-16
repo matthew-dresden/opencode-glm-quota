@@ -53,7 +53,7 @@ jobs:
 
       - name: Build (tsc)
         shell: bash
-        run: npm run build
+        run: npm run compile
 
       - name: Unit and functional tests (upstream runner)
         shell: bash
