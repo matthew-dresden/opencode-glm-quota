@@ -1,14 +1,15 @@
 # opencode-glm-quota
 
-[![npm version](https://img.shields.io/npm/v/opencode-glm-quota.svg)](https://www.npmjs.com/package/opencode-glm-quota)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://github.com/guyinwonder168/opencode-glm-quota/workflows/CI/badge.svg)](https://github.com/guyinwonder168/opencode-glm-quota/actions)
-[![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-light.svg)](https://sonarcloud.io/summary/new_code?id=guyinwonder168_opencode-glm-quota)
----
-[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=guyinwonder168_opencode-glm-quota&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=guyinwonder168_opencode-glm-quota)
-[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=guyinwonder168_opencode-glm-quota&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=guyinwonder168_opencode-glm-quota)
-[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=guyinwonder168_opencode-glm-quota&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=guyinwonder168_opencode-glm-quota)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=guyinwonder168_opencode-glm-quota&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=guyinwonder168_opencode-glm-quota)
+## Provenance
+
+- Upstream: https://github.com/guyinwonder168/opencode-glm-quota (MIT, LICENSE file shipped upstream).
+- Imported: full git history and all tags through `v1.8.1` (upstream HEAD `f31d4f250c792b293c2a8812955e569efd96277f` at import time), mirrored into this repository.
+- This fork is licensed Apache-2.0 (see `LICENSE`); the MIT-licensed upstream code is relicensed with attribution retained in `NOTICE`.
+- Fork decision (R17): the `bin/install.js` postinstall and the `integration/` agent/command/skill extras are dropped. The fork ships the self-contained `glm_quota` plugin tool only; nothing executes at npm-install time. Any integration extra worth keeping will be re-registered as a V2-native plugin hook, not an installer.
+- Source-review paths (R15): V1 plugin installs live at `~/.cache/opencode/packages/opencode-glm-quota@latest/node_modules/opencode-glm-quota/`; the V2 plugin cache is `~/.cache/opencode/npm/`.
+
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Build Status](https://github.com/matthew-dresden/opencode-glm-quota/actions/workflows/ci.yml/badge.svg)](https://github.com/matthew-dresden/opencode-glm-quota/actions)
 
 OpenCode plugin to query Z.ai GLM Coding Plan usage statistics with real-time quota monitoring, model usage tracking, and MCP tool usage.
 
