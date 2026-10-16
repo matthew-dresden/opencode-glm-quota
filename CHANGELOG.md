@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1] - 2026-10-16
+
+### Fixed
+
+- build dist on git-ref installs via prepare script (#10)
+
+
 ## [2.0.0] - 2026-10-16
 
 ### Breaking Changes
