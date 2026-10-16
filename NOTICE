@@ -1,0 +1,13 @@
+opencode-glm-quota
+Copyright 2026 Matthew Dresden
+
+This product includes software developed by guyinwonder168
+(https://github.com/guyinwonder168/opencode-glm-quota), originally
+licensed under the MIT License. The upstream copyright notice is retained
+here: Copyright (c) 2026 (see the upstream LICENSE file, reproduced in the
+repository history). The MIT-licensed upstream code, imported with full
+history at upstream commit f31d4f250c792b293c2a8812955e569efd96277f
+(tag v1.8.1 and all prior tags), is relicensed under the Apache License 2.0
+in this fork, with attribution retained in this NOTICE file. This
+repository and its derivative works are licensed under the Apache License
+2.0, which the LICENSE file carries in full.
