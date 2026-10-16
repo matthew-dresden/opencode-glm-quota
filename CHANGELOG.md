@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.2] - 2026-10-16
+
+### Maintenance
+
+- fork bootstrap (license, provenance, pipeline) (#1)
+- bump brace-expansion from 2.0.3 to 2.1.4 (#45)
+- bump js-yaml from 4.3.0 to 4.3.1 (#44)
+
 All notable changes to GLM Status Plugin project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
