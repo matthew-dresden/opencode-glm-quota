@@ -56,7 +56,7 @@ jobs:
 
       - name: Build (tsc)
         shell: bash
-        run: npm run build
+        run: npm run compile
 
   test:
     runs-on: ubuntu-latest
@@ -101,7 +101,7 @@ jobs:
 
       - name: Build for tarball contents
         shell: bash
-        run: npm run build
+        run: npm run compile
 
       - name: Tarball allowlist and leak gates
         shell: bash
