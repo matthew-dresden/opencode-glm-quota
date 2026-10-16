@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.0] - 2026-10-16
+
+### Breaking Changes
+
+- port to the opencode v2 plugin API (dual-shape) (#7)
+
+### Added
+
+- port to the opencode v2 plugin API (dual-shape) (#7)
+
 ## [1.8.4] - 2026-10-16
 
 ### Maintenance
