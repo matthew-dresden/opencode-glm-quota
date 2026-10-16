@@ -35,7 +35,10 @@ const CANDIDATE_PROVIDER_IDS = [
   'z-ai',
   'z.ai',
   'zhipu',
-  'zhipuai'
+  'zhipuai',
+  // The v2-migration config defines its Z.ai provider under the id `zai-max`;
+  // detectPlatform() already resolves it to ZAI, so discovery only needs the id.
+  'zai-max'
 ] as const;
 
 const DEFAULT_TOKEN_LIMIT = 40000000;
