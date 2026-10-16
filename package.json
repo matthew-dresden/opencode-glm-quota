@@ -47,9 +47,6 @@
   "dependencies": {
     "jsonc-parser": "^3.2.0"
   },
-  "peerDependencies": {
-    "@opencode-ai/plugin": ">=0.1.0"
-  },
   "overrides": {
     "minimatch": "^9.0.7"
   },
@@ -57,7 +54,6 @@
     "access": "public"
   },
   "devDependencies": {
-    "@opencode-ai/plugin": "^1.1.30",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",

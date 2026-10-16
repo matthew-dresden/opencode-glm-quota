@@ -25,49 +25,64 @@ OpenCode plugin to query Z.ai GLM Coding Plan usage statistics with real-time qu
 - 🏷️ Account plan display - Shows your subscription tier (Lite, Pro, etc.)
 - ⚡ Fail-fast error handling (no retry logic - user controls when to retry)
 
+## opencode v2 support
+
+This fork ships a **dual-shape** plugin: one default export that works on both
+host generations (per the frozen migration guide, "Support V1 and V2 from one
+package"):
+
+```js
+export default {
+  id: "opencode-glm-quota",
+  async setup(ctx) { /* V2: ctx.tool.transform registration */ },
+  async server() { /* V1: legacy hooks object */ },
+}
+```
+
+- **opencode v2 hosts** call `setup()`, which registers the `glm_quota` tool
+  through `ctx.tool.transform` with a JSON Schema input
+  (`{"type":"object","properties":{},"additionalProperties":false}`) and a
+  structured `{ content }` return. The plugin id is `opencode-glm-quota`.
+- **opencode v1 hosts (>= 1.18.29)** call `server()`, which returns the same
+  `glm_quota` tool definition as v1.8.4 (the legacy `tool()` helper was an
+  identity function, so the hooks object is unchanged). Older v1 hosts that do
+  not understand object entrypoints are not supported.
+- The package is **dependency-free at runtime** — it imports neither
+  `@opencode-ai/plugin` (v1) nor `@opencode/plugin` (v2).
+- **Credential resolution is unchanged in v2**: the tool still discovers
+  credentials from OpenCode's `auth.json` candidates
+  (`~/.local/share/opencode/auth.json`, plus the legacy Windows fallback), then
+  the `ZAI_API_KEY` / `ZHIPU_API_KEY` / `ZHIPUAI_API_KEY` environment
+  variables, and queries the Z.ai monitoring endpoints itself.
+
+### Installing under opencode v2
+
+Pin the exact signed tag in your `opencode.jsonc` (git-ref consumption format):
+
+```jsonc
+{
+  "plugins": [
+    "git+https://github.com/matthew-dresden/opencode-glm-quota.git#v2.0.0"
+  ]
+}
+```
+
+Use an exact `vX.Y.Z` tag — mutable refs (branch names, `#main`) are not
+supported. Until the fork's first v2 release is cut, no published tag carries
+the dual shape.
+
 ## Installation
 
-### Option 1: npm (Recommended)
+The fork drops the upstream `bin/install.js` installer and the `integration/`
+extras (R17 decision) — nothing executes at npm-install time, and there is no
+`npx opencode-glm-quota install`. The plugin registers itself with the host on
+load; the `/glm_quota` command/agent/skill extras are not shipped.
 
-```bash
-# Install plugin
-npm install opencode-glm-quota
+### Option 1: git-ref pin (opencode v2, recommended)
 
-# Run installer to configure OpenCode
-npx opencode-glm-quota install
-```
+See ["Installing under opencode v2"](#installing-under-opencode-v2) above.
 
-**What the installer does:**
-- Copies `/glm_quota` command to `~/.config/opencode/command/glm_quota.md`
-- Copies skill documentation to `~/.config/opencode/skills/glm-quota/SKILL.md`
-- Automatically adds plugin to your OpenCode config
-- Copies agent to `~/.config/opencode/agents/`
-- Supports `--force` flag to overwrite existing files
-
-### Uninstall
-
-```bash
-# Remove OpenCode integration files and config
-npx opencode-glm-quota uninstall
-
-# If installed globally
-npx opencode-glm-quota uninstall --global
-```
-
-**What the uninstaller does:**
-- Removes `/glm_quota` command
-- Deletes `skills/glm-quota/SKILL.md`
-- Removes plugin entry from OpenCode config
-- Removes agent file and legacy config
-- Runs `npm remove opencode-glm-quota` (or `--global`)
-
-### Option 2: From GitHub
-
-```bash
-npm install github:guyinwonder168/opencode-glm-quota
-```
-
-### Option 3: Local Development
+### Option 2: Local Development
 
 ```bash
 # Clone and build
@@ -79,9 +94,6 @@ npm run build
 # Run the test suite
 npm test
 ```
-
-Note: the fork drops the upstream `bin/install.js` installer and the
-`integration/` extras (R17); nothing executes at npm-install time.
 
 ## Quick Start
 
@@ -301,7 +313,8 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ## License
 
-MIT © 2026
+Apache-2.0 — see [LICENSE](LICENSE). Upstream MIT attribution is retained in
+[NOTICE](NOTICE).
 
 ## Acknowledgments
 
