@@ -89,7 +89,7 @@ See ["Installing under opencode v2"](#installing-under-opencode-v2) above.
 git clone https://github.com/matthew-dresden/opencode-glm-quota.git
 cd opencode-glm-quota
 npm install
-npm run build
+npm run compile
 
 # Run the test suite
 npm test
@@ -254,7 +254,7 @@ Content-Type: application/json
 
 ```bash
 # Build TypeScript to JavaScript
-npm run build
+npm run compile
 
 # Clean build artifacts
 npm run clean
