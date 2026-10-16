@@ -5,8 +5,6 @@
  * model usage, and MCP tool usage.
  */
 
-import { type Plugin } from "@opencode-ai/plugin";
-import { tool } from "@opencode-ai/plugin/tool";
 import * as fs from "fs";
 import type { Platform } from "./api/platforms.js";
 import { detectPlatform, getPlatformName } from "./api/platforms.js";
@@ -78,6 +76,52 @@ interface QuotaLimitItem {
 interface ProcessedQuotaLimit {
   limits?: QuotaLimitItem[];
   [key: string]: unknown;
+}
+
+// ============================================================================
+// PLUGIN SHAPE TYPES
+// ============================================================================
+
+/**
+ * V1 hooks object returned by the `server()` entrypoint (legacy hosts >= 1.18.29
+ * call `server()`; the host's plugin loader accepts the tool definition as-is —
+ * the old `@opencode-ai/plugin` `tool()` helper was an identity function).
+ */
+interface V1ToolDefinition {
+  description: string;
+  args: Record<string, never>;
+  execute: () => Promise<string>;
+}
+
+interface V1PluginHooks {
+  tool: { glm_quota: V1ToolDefinition };
+}
+
+/**
+ * Minimal structural types for the V2 plugin API (`@opencode/plugin` shape).
+ * The default export matches what `Plugin.define` produces without importing it,
+ * keeping the package dependency-free (the canary probe proved the plain-object
+ * shape passes V2 schema validation).
+ */
+interface V2ToolDefinition {
+  name: string;
+  description: string;
+  input: {
+    type: 'object';
+    properties: Record<string, never>;
+    additionalProperties: false;
+  };
+  execute: (input: Record<string, unknown>) => Promise<{ content: string }>;
+}
+
+interface V2ToolEditor {
+  add: (definition: V2ToolDefinition) => void;
+}
+
+interface V2PluginContext {
+  tool: {
+    transform: (callback: (editor: V2ToolEditor) => void) => Promise<void>;
+  };
 }
 
 // ============================================================================
@@ -513,37 +557,98 @@ async function queryAllUsage(credentials: Credentials): Promise<string> {
 }
 
 // ============================================================================
-// PLUGIN EXPPORT
+// PLUGIN ENTRYPOINTS (dual shape)
 // ============================================================================
 
-export const GlmQuotaPlugin: Plugin = async () => {
+/**
+ * The glm_quota tool description, shared verbatim by both entrypoints.
+ */
+const GLM_QUOTA_DESCRIPTION =
+  'Query Z.ai GLM Coding Plan usage statistics including quota limits, model usage, and MCP tool usage';
+
+/**
+ * Run the quota query and return the Markdown summary.
+ *
+ * Single quota-fetch path shared by the V1 and V2 registrations. Guards per
+ * the ratified amendment 9 discipline: non-essential failures (network, API,
+ * rendering) are caught and returned as loud Markdown error content — never
+ * thrown at the host — while the missing-credentials outcome is the explicit
+ * "Credentials Not Found" error content with setup instructions (loud, not
+ * swallowed). Credential discovery itself (auth.json candidates → env vars)
+ * is unchanged from V1.
+ *
+ * @returns Markdown quota summary or Markdown error message
+ */
+async function runQuotaQuery(): Promise<string> {
+  try {
+    const credentials = await getCredentials();
+
+    if (!credentials) {
+      return createCredentialError();
+    }
+
+    return await queryAllUsage(credentials);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (errorMessage.trim().startsWith('### ⚠️ ')) {
+      return errorMessage;
+    }
+
+    return createMarkdownError('Error', {}, errorMessage);
+  }
+}
+
+/**
+ * V1 entrypoint: legacy hosts call `server()` and use the returned hooks.
+ * Byte-compatible with the v1.8.4 export: same hooks object shape, same tool
+ * definition, same execute behavior (the removed `tool()` helper was an
+ * identity function, so the host received exactly this object before).
+ *
+ * @returns V1 hooks containing the glm_quota tool
+ */
+async function server(): Promise<V1PluginHooks> {
   return {
     tool: {
-      glm_quota: tool({
-        description: 'Query Z.ai GLM Coding Plan usage statistics including quota limits, model usage, and MCP tool usage',
+      glm_quota: {
+        description: GLM_QUOTA_DESCRIPTION,
         args: {},
-        async execute() {
-          try {
-            const credentials = await getCredentials();
-            
-            if (!credentials) {
-              return createCredentialError();
-            }
-            
-            return await queryAllUsage(credentials);
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-
-            if (errorMessage.trim().startsWith('### ⚠️ ')) {
-              return errorMessage;
-            }
-
-            return createMarkdownError('Error', {}, errorMessage);
-          }
+        async execute(): Promise<string> {
+          return runQuotaQuery();
         }
-      })
+      }
     }
-  }
-};
+  };
+}
 
-export default GlmQuotaPlugin;
+/**
+ * V2 entrypoint: registers the glm_quota tool through `ctx.tool.transform`
+ * with a JSON Schema input and a structured `{ content }` return.
+ *
+ * @param ctx - V2 plugin context (domain APIs)
+ */
+async function setup(ctx: V2PluginContext): Promise<void> {
+  await ctx.tool.transform((editor) => {
+    editor.add({
+      name: 'glm_quota',
+      description: GLM_QUOTA_DESCRIPTION,
+      input: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false
+      },
+      async execute(): Promise<{ content: string }> {
+        const content = await runQuotaQuery();
+        return { content };
+      }
+    });
+  });
+}
+
+/**
+ * Dual-shape default export (frozen migration guide, "Support V1 and V2 from
+ * one package"): V1 hosts call `server()`, V2 hosts call `setup()`. The plain
+ * object matches the `Plugin.define` output shape without importing it, so
+ * the package has no runtime dependency on any opencode package.
+ */
+export default { id: 'opencode-glm-quota', setup, server };
