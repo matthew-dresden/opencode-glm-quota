@@ -48,6 +48,10 @@ logs/
 .env.test
 .env.production
 
+# Python (ci/ release pipeline package)
+__pycache__/
+*.py[cod]
+
 # Test coverage
 coverage/
 .nyc_output/

@@ -5,24 +5,21 @@
   "description": "OpenCode plugin to query Z.ai GLM Coding Plan usage statistics including quota limits, model usage, and MCP tool usage",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "bin": {
-    "opencode-glm-quota": "./bin/install.js"
-  },
   "files": [
     "dist",
-    "integration",
-    "bin",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build",
-    "postinstall": "node bin/install.js",
     "test": "tsx --test $(find tests -name '*.test.ts' -type f)",
     "test:coverage": "c8 --reporter=lcov --reporter=text -- npm test",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "check:tarball": "node scripts/check-tarball.mjs",
+    "check:license": "node scripts/check-license.mjs"
   },
   "keywords": [
     "opencode",
@@ -38,15 +35,15 @@
     "llm"
   ],
   "author": "guyinwonder168 <guyinwonder168@gmail.com>",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/guyinwonder168/opencode-glm-quota.git"
+    "url": "git+https://github.com/matthew-dresden/opencode-glm-quota.git"
   },
   "bugs": {
-    "url": "https://github.com/guyinwonder168/opencode-glm-quota/issues"
+    "url": "https://github.com/matthew-dresden/opencode-glm-quota/issues"
   },
-  "homepage": "https://github.com/guyinwonder168/opencode-glm-quota#readme",
+  "homepage": "https://github.com/matthew-dresden/opencode-glm-quota#readme",
   "dependencies": {
     "jsonc-parser": "^3.2.0"
   },
