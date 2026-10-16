@@ -1,8 +1,7 @@
 import { describe, test } from 'node:test';
 import * as assert from 'node:assert';
-import { GlmQuotaPlugin } from '../../src/index.js';
+import glmQuotaPlugin from '../../src/index.js';
 
-type PluginContext = Parameters<typeof GlmQuotaPlugin>[0];
 type ToolExecutor = {
   execute: (args?: Record<string, unknown>, context?: Record<string, unknown>) => Promise<string> | string;
 };
@@ -15,7 +14,7 @@ describe('Integration: Plugin Error Catch Block', () => {
 
       try {
         // Create plugin instance
-        const plugin = await GlmQuotaPlugin({} as unknown as PluginContext);
+        const plugin = await glmQuotaPlugin.server();
         const tool = plugin.tool!.glm_quota;
 
         // Mock Date constructor to throw an error
@@ -48,7 +47,7 @@ describe('Integration: Plugin Error Catch Block', () => {
       process.env.ZAI_API_KEY = 'test-token';
 
       try {
-        const plugin = await GlmQuotaPlugin({} as unknown as PluginContext);
+        const plugin = await glmQuotaPlugin.server();
         const tool = plugin.tool!.glm_quota;
 
         const originalDate = global.Date;
@@ -81,7 +80,7 @@ describe('Integration: Plugin Error Catch Block', () => {
       process.env.ZAI_API_KEY = 'test-token';
 
       try {
-        const plugin = await GlmQuotaPlugin({} as unknown as PluginContext);
+        const plugin = await glmQuotaPlugin.server();
         const tool = plugin.tool!.glm_quota;
 
         const originalDate = global.Date;
@@ -116,7 +115,7 @@ describe('Integration: Plugin Error Catch Block', () => {
       process.env.ZAI_API_KEY = 'test-token';
 
       try {
-        const plugin = await GlmQuotaPlugin({} as unknown as PluginContext);
+        const plugin = await glmQuotaPlugin.server();
         const tool = plugin.tool!.glm_quota;
 
         const originalDate = global.Date;

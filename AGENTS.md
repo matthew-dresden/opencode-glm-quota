@@ -144,7 +144,7 @@ src/
 
 ### Import Order
 1. Core Node.js modules (`fs`, `path`, `os`, `https`)
-2. Third-party imports (`@opencode-ai/plugin`)
+2. Third-party imports (none — the plugin is dependency-free at runtime)
 3. Local imports (if any)
 4. Type imports (use `import type` where possible)
 
@@ -152,7 +152,7 @@ src/
 // ✅ Correct
 import * as fs from "fs"
 import * as path from "path"
-import { type Plugin, tool } from "@opencode-ai/plugin"
+import type { Platform } from "./api/platforms.js"
 ```
 
 ### Naming Conventions
@@ -393,208 +393,75 @@ npm run build                           # Ensure compiles
 - ALL context needed for OpenAgents: `/home/eddy/distrobox/box-go-debian-home/.config/opencode/context/` - find the needed context here if you didnt found it in the project folder
 - Code standards: `/home/eddy/distrobox/box-go-debian-home/.config/opencode/context/core/standards/code.md` - Detailed principles above
 
-### Plugin Architecture (OpenCode Plugin)
+### Plugin Architecture (Dual-Shape Plugin)
 
-**Export Structure:**
+**Export Structure** (v2 port, "Support V1 and V2 from one package"):
+
 ```typescript
-import { type Plugin, tool } from "@opencode-ai/plugin"
+// No @opencode-ai/plugin import — the package is dependency-free at runtime.
+// The plain object matches the v2 Plugin.define output shape.
 
-export const GlmQuotaPlugin: Plugin = async ({ client }) => {
+async function server() {
   return {
     tool: {
-      glm_quota: tool({
+      glm_quota: {
         description: 'Query Z.ai GLM Coding Plan usage statistics...',
         args: {},
-        async execute(args, context) {
-          // Implementation
+        async execute() {
+          // shared quota-fetch logic; returns Markdown string
         }
-      })
+      }
     }
   }
 }
 
-export default GlmQuotaPlugin
-```
-
-### Command with Minimal Agent Configuration
-
-To minimize context usage when using `/glm_quota` command, we've configured a specialized minimal agent:
-
-**Agent Definition (in `.opencode/opencode.json`):**
-```json
-{
-  "agent": {
-    "glm-quota-exec": {
-      "mode": "subagent",
-      "system": "You are a minimal tool executor. Your only purpose is to execute the glm_quota tool when requested. Do not explain, reason, or add any commentary. Simply call the tool and return its output directly.",
-      "provider": "anthropic",
-      "model": "claude-3-5-sonnet-20241022"
-    }
-  }
+async function setup(ctx) {
+  await ctx.tool.transform((editor) => {
+    editor.add({
+      name: 'glm_quota',
+      description: 'Query Z.ai GLM Coding Plan usage statistics...',
+      input: { type: 'object', properties: {}, additionalProperties: false },
+      async execute() {
+        const content = await serverToolBody(); // same shared logic
+        return { content };
+      }
+    })
+  })
 }
+
+export default { id: 'opencode-glm-quota', setup, server }
 ```
 
-**Command File (`.opencode/command/glm_quota.md`):**
-```markdown
----
-description: Execute GLM quota check
-agent: glm-quota-exec
----
-Execute glm_quota tool.
-```
+- v1 hosts (>= 1.18.29) call `server()`; v2 hosts call `setup()`.
+- Both registrations share ONE quota-fetch implementation — never duplicate it.
+- The v2 tool uses a JSON Schema `input` and returns structured `{ content }`.
 
-**How It Works:**
-1. User types `/glm_quota` in OpenCode
-2. OpenCode loads command file (15 characters - minimal!)
-3. System prompt sets agent to minimal executor mode
-4. LLM receives minimal instructions: "Execute glm_quota tool"
-5. LLM calls `glm_quota` tool directly without reasoning
-6. Tool returns results to user
+### Dual-Shape Export Rules
 
-**Context Usage Comparison:**
+**CRITICAL: one default export, nothing else**
 
-| Approach | Command File Size | System Prompt | Reasoning | Total Context |
-|----------|-------------------|---------------|-----------|----------------|
-| Standard command | ~300 chars | Default agent | Full | High |
-| Minimal command | ~15 chars | Minimal agent (no reasoning) | None | **Low** |
+Both host generations resolve the plugin from the module's default export —
+the dual-shape object `{ id, setup, server }`:
 
-**Benefits:**
-- ✅ Minimal command file content (15 chars vs 300)
-- ✅ Minimal agent system prompt (no explanation/reasoning)
-- ✅ Direct tool execution without intermediate text
-- ✅ Still discoverable in TUI autocomplete
-- ✅ Part of OpenCode command system
+- v1 hosts (>= 1.18.29) accept the object entrypoint and call `server()`;
+  the legacy loader iterated every module export, so the module exports ONLY
+  the default object (no named exports).
+- v2 hosts read the default definition and call `setup()`; the `id` field
+  scopes plugin storage and diagnostics.
 
-**Plugin Context Received:**
-- `client`: OpenCode SDK client for logging, app context
-- `project`: Current project information
-- `directory`: Working directory
-- `worktree`: Git worktree path
-- `$`: Shell commands
+Rules:
 
-**Installation & Configuration**
-
-The package includes an automatic installer that configures OpenCode:
-
-```bash
-npm install opencode-glm-quota
-npx opencode-glm-quota install
-```
-
-**What installer does:**
-- Copies `/glm_quota` command to `~/.config/opencode/command/glm_quota.md`
-- Copies skill documentation to `~/.config/opencode/skills/glm-quota/SKILL.md` (OpenCode spec)
-- Automatically adds `opencode-glm-quota` to your OpenCode config's plugin array
-- Merges `glm-quota-exec` agent configuration into `~/.config/opencode/opencode.jsonc`
-- Supports `--force` flag to overwrite existing files
-
-**Installer fixes (v1.3.0):**
-- ✅ Package name: Uses `opencode-glm-quota` (not scoped `@opencode-glm-quota/plugin`)
-- ✅ Bin command: `opencode-glm-quota install` (not `opencode-glm-quota-install`)
-- ✅ Entry point: Removed fragile condition, always runs main() function
-- ✅ Config merging: Only creates the array being used (`plugin` or `plugins`), not both
-- ✅ Skill structure: Follows OpenCode spec (`skills/<name>/SKILL.md`)
-- ✅ No manual config: Users don't need to edit opencode.json manually
-
-**Key Differences from Standalone Scripts:**
-- `client`: OpenCode SDK client for logging, app context
-- `project`: Current project information
-- `directory`: Working directory
-- `worktree`: Git worktree path
-- `$`: Shell commands
-
-**Key Differences from Standalone Scripts:**
-- ❌ No direct file I/O for auth.json
-- ❌ No manual authentication prompts
-- ❌ No environment variable parsing as primary method
-- ✅ Receive auth context from OpenCode automatically
-- ✅ Use `client.app.log()` for structured logging
-- ✅ Throw errors and let OpenCode display them
-
-### Critical Plugin Rules
-
-**CRITICAL: Plugin Loader Behavior**
-
-OpenCode's plugin loader (`packages/opencode/src/plugin/index.ts`) iterates through **ALL exports** from a module and tries to initialize each one as a plugin:
-
-```typescript
-for (const [_name, fn] of Object.entries<PluginInstance>(mod)) {
-  const init = await fn(input)  // ← EVERY export is called here!
-  hooks.push(init)
-}
-```
-
-**Rule 1: Correct Import Paths**
-
-```typescript
-// ❌ WRONG
-import { tool } from "@opencode-ai/plugin"
-
-// ✅ CORRECT
-import { tool } from "@opencode-ai/plugin/tool"
-```
-
-The `tool` helper is exported from the subpath `/tool`, not from the main package index.
-
-**Rule 2: Only Export Plugin Functions**
-
-```typescript
-// ❌ WRONG - Loader will try to initialize these as plugins
-export type Platform = 'ZAI' | 'ZHIPU'
-export interface Credentials { token: string; platform: Platform }
-export function getProviderPlatform(...) { ... }
-export function createCredentialError() { ... }
-export function getCredentials() { ... }
-export const MyPlugin: Plugin = async (ctx) => { ... }
-
-// ✅ CORRECT - Only plugin functions are exported
-type Platform = 'ZAI' | 'ZHIPU'              // Internal
-interface Credentials { token: string; platform: Platform } // Internal
-function getProviderPlatform(...) { ... }           // Internal
-function createCredentialError() { ... }               // Internal
-function getCredentials() { ... }                    // Internal
-export const MyPlugin: Plugin = async (ctx) => { ... }
-export default MyPlugin
-```
-
-**Why This Matters:**
-
-If you export non-plugin items (types, interfaces, helper functions), the loader will:
-1. Try to call types/interfaces as functions → TypeError
-2. Call helper functions → They don't return Hooks object → Error
-3. Eventually call the actual plugin → Might work, but errors from previous attempts cause startup failure
-
-**What Happens with Wrong Exports:**
-
-```typescript
-// File with 6 exports
-export type Platform = ...
-export interface Credentials { ... }
-export function getProviderPlatform() { ... }
-export function createCredentialError() { ... }
-export function getCredentials() { ... }
-export const GlmQuotaPlugin: Plugin = ...
-export default GlmQuotaPlugin
-
-// Loader does:
-const init = await Platform()        // ❌ TypeError: Platform is a type, not a function
-const init = await Credentials()     // ❌ TypeError: Credentials is an interface
-const init = await getProviderPlatform() // ❌ Returns null, not a Hooks object
-const init = await createCredentialError() // ❌ Returns string, not a Hooks object
-const init = await getCredentials()       // ❌ Returns null, not a Hooks object
-const init = await GlmQuotaPlugin() // ✅ Finally works!
-```
-
-**Best Practice:**
-
-Keep helper functions internal (remove `export` keyword) to prevent the plugin loader from attempting to initialize them as plugins.
-
-**Reference Error:**
-```
-TypeError: null is not an object (evaluating 'hook.config')
-```
-
-This error occurs when a non-plugin export is called and returns something other than a valid Hooks object.
+1. **No named exports from `src/index.ts`** — no plugin factory, no helpers,
+   no types. All helpers stay module-internal.
+2. **No `@opencode-ai/plugin` / `@opencode/plugin` imports** — the package is
+   dependency-free at runtime. The v1 `tool()` helper was an identity
+   function, so hosts receive the plain definition object unchanged.
+3. **One quota-fetch implementation** — both `server()` and `setup()`
+   registrations share the same internal `runQuotaQuery()`.
+4. **Guarded execute paths** (amendment 9 discipline): non-essential failures
+   are caught and returned as Markdown error content, never thrown at the
+   host; the missing-credentials outcome is the loud "Credentials Not Found"
+   error content with setup instructions.
 
 ## Testing
 - Write tests in TypeScript with `.test.ts` extension

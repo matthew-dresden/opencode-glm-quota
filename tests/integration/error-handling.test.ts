@@ -1,8 +1,7 @@
 import { describe, test } from 'node:test';
 import * as assert from 'node:assert';
-import { GlmQuotaPlugin } from '../../src/index.js';
+import glmQuotaPlugin from '../../src/index.js';
 
-type PluginContext = Parameters<typeof GlmQuotaPlugin>[0];
 type ToolExecutor = {
   execute: (args?: Record<string, unknown>, context?: Record<string, unknown>) => Promise<string> | string;
 };
@@ -26,7 +25,7 @@ describe('Integration: Error Handling in src/index.ts', () => {
       global.Date = ThrowingDate as DateConstructor;
 
       // Create plugin instance
-      const plugin = await GlmQuotaPlugin({} as unknown as PluginContext);
+      const plugin = await glmQuotaPlugin.server();
       const tool = plugin.tool!.glm_quota;
 
       const result = await (tool as unknown as ToolExecutor).execute();
