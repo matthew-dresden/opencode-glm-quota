@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.3] - 2026-10-16
+
+### Fixed
+
+- resolve credentials for zai-max provider id (#16)
+
 ## [2.0.2] - 2026-10-16
 
 ### Fixed
