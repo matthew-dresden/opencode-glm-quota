@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.2] - 2026-10-16
+
+### Fixed
+
+- ship dist committed; drop the build script key that breaks git-ref installs (#13)
+
 ## [2.0.1] - 2026-10-16
 
 ### Fixed
