@@ -127,12 +127,6 @@ src/
     date-formatter.ts # Date/time formatting utilities
     progress-bar.ts   # ASCII progress bar rendering
     time-window.ts    # Rolling window calculation
-  integration/
-    agents/glm-quota-exec.md     # Minimal executor agent (Markdown)
-    command/glm_quota.md         # /glm_quota slash command
-    skills/glm-quota/SKILL.md     # Skill documentation (OpenCode spec: skills/<name>/SKILL.md)
-  bin/
-    install.js                    # Installation script
   dist/                             # Compiled JavaScript (generated)
   tests/                            # Test suite
   package.json                       # Dependencies and scripts
