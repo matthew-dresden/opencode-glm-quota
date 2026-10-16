@@ -109,7 +109,10 @@ jobs:
 
   version-immutability:
     # Release-bot PRs are exempt: the release pipeline owns the version field.
-    if: github.event.pull_request.user.login != 'matthew-dresden-cicd[bot]'
+    # The bot identity is configuration (repo variable RELEASE_BOT_LOGIN, set
+    # to matthewdresden-opencode-mcp[bot]). If the variable is unset the check
+    # enforces on every PR (fail-closed).
+    if: github.event.pull_request.user.login != vars.RELEASE_BOT_LOGIN
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

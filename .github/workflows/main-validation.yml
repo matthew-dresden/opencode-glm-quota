@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GIT_USER: "matthew-dresden-cicd[bot]"
-  GIT_USER_EMAIL: "matthew-dresden-cicd[bot]@users.noreply.github.com"
+  GIT_USER: "${{ vars.RELEASE_BOT_LOGIN }}"
+  GIT_USER_EMAIL: "${{ vars.RELEASE_BOT_LOGIN }}@users.noreply.github.com"
 
 jobs:
   skip-check:
