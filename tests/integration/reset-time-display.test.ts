@@ -3,12 +3,11 @@ import assert from 'node:assert'
 import { EventEmitter } from 'node:events'
 import type { RequestOptions } from 'node:https'
 import { createRequire, syncBuiltinESMExports } from 'node:module'
-import { GlmQuotaPlugin } from '../../src/index.js'
+import glmQuotaPlugin from '../../src/index.js'
 
 const require = createRequire(import.meta.url)
 const https = require('node:https') as typeof import('node:https')
 
-type PluginContext = Parameters<typeof GlmQuotaPlugin>[0]
 type ToolExecutor = {
   execute: (args?: Record<string, unknown>, context?: Record<string, unknown>) => Promise<string> | string
 }
@@ -100,7 +99,7 @@ describe('Reset Time Display Integration', () => {
     }) as typeof https.request
     syncBuiltinESMExports()
 
-    const plugin = await GlmQuotaPlugin({} as unknown as PluginContext)
+    const plugin = await glmQuotaPlugin.server()
     const result = await (plugin.tool!.glm_quota as unknown as ToolExecutor).execute()
 
     // Should show countdown + local time: "4h 42m (HH:MM)"
@@ -137,7 +136,7 @@ describe('Reset Time Display Integration', () => {
     }) as typeof https.request
     syncBuiltinESMExports()
 
-    const plugin = await GlmQuotaPlugin({} as unknown as PluginContext)
+    const plugin = await glmQuotaPlugin.server()
     const result = await (plugin.tool!.glm_quota as unknown as ToolExecutor).execute()
 
     // Should show countdown + day name + local time: "4d 12h (Day HH:MM)"
@@ -178,7 +177,7 @@ describe('Reset Time Display Integration', () => {
     }) as typeof https.request
     syncBuiltinESMExports()
 
-    const plugin = await GlmQuotaPlugin({} as unknown as PluginContext)
+    const plugin = await glmQuotaPlugin.server()
     const result = await (plugin.tool!.glm_quota as unknown as ToolExecutor).execute()
 
     assert.ok(result.includes('| 🔌 MCP (1 Month) | 12.3% | `█░░░░░░░░░░░` | — |'))
