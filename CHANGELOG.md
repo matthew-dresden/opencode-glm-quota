@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.3] - 2026-10-16
+
+### Maintenance
+
+- drive release-bot identity from RELEASE_BOT_LOGIN variable (#3)
+
 ## [1.8.2] - 2026-10-16
 
 ### Maintenance
