@@ -14,6 +14,7 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run clean && npm run build",
     "test": "tsx --test $(find tests -name '*.test.ts' -type f)",
     "test:coverage": "c8 --reporter=lcov --reporter=text -- npm test",
