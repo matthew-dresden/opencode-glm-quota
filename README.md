@@ -71,17 +71,17 @@ npm install github:guyinwonder168/opencode-glm-quota
 
 ```bash
 # Clone and build
-git clone https://github.com/guyinwonder168/opencode-glm-quota.git
+git clone https://github.com/matthew-dresden/opencode-glm-quota.git
 cd opencode-glm-quota
 npm install
 npm run build
 
-# Link for local testing
-npm link
-
-# Run the installer for local testing
-node bin/install.js
+# Run the test suite
+npm test
 ```
+
+Note: the fork drops the upstream `bin/install.js` installer and the
+`integration/` extras (R17); nothing executes at npm-install time.
 
 ## Quick Start
 
@@ -279,12 +279,6 @@ src/
     date-formatter.ts   # Date/time formatting utilities
     progress-bar.ts     # ASCII progress bar rendering
     time-window.ts      # Rolling window calculation
-integration/
-  agents/glm-quota-exec.md      # Minimal executor agent (Markdown)
-  command/glm_quota.md          # /glm_quota slash command
-  skills/glm-quota/SKILL.md      # Skill documentation
-bin/
-  install.js                     # Installation script
 dist/                   # Compiled JavaScript (generated)
 tests/                  # Test suite
 package.json            # Dependencies and scripts
