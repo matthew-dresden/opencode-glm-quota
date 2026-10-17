@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.4] - 2026-10-17
+
+### Fixed
+
+- correct NOTICE import-commit attribution (#18)
+
 ## [2.0.3] - 2026-10-16
 
 ### Fixed
