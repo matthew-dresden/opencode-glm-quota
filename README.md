@@ -49,11 +49,17 @@ export default {
   not understand object entrypoints are not supported.
 - The package is **dependency-free at runtime** — it imports neither
   `@opencode-ai/plugin` (v1) nor `@opencode/plugin` (v2).
-- **Credential resolution is unchanged in v2**: the tool still discovers
-  credentials from OpenCode's `auth.json` candidates
-  (`~/.local/share/opencode/auth.json`, plus the legacy Windows fallback), then
-  the `ZAI_API_KEY` / `ZHIPU_API_KEY` / `ZHIPUAI_API_KEY` environment
-  variables, and queries the Z.ai monitoring endpoints itself.
+- **Multi-account credential discovery (v2.0.5)**: the tool discovers EVERY
+  `auth.json` entry whose key starts with `zai-max` (covering the legacy
+  `zai-max` id plus renamed or additional accounts such as `zai-max-brim` and
+  `zai-max-accordion`) alongside the legacy exact ids (`zai-coding-plan`,
+  `zai`, `zhipu`, ...), queries the quota API once per discovered key, and
+  renders one clearly labeled section per account (the auth.json key is the
+  label). One account's API failure renders as a loud error section for that
+  account only and never masks the other accounts. When no auth.json account
+  exists, the `ZAI_API_KEY` / `ZHIPU_API_KEY` / `ZHIPUAI_API_KEY`
+  environment variables remain the dev/testing fallback. API keys are never
+  printed; they are masked to first4/last4 wherever one would appear.
 
 ### Installing under opencode v2
 
@@ -222,6 +228,16 @@ The plugin automatically detects the platform based on the provider ID used duri
 | `zai-coding-plan` | ZAI | `https://api.z.ai` |
 | `zai` | ZAI | `https://api.z.ai` |
 | `zhipu` | ZHIPU | `https://open.bigmodel.cn` |
+| any key starting with `zai-max` (e.g. `zai-max`, `zai-max-brim`, `zai-max-accordion`) | ZAI | `https://api.z.ai` |
+
+### Multi-Account Output
+
+When auth.json holds several matching entries (for example the legacy
+`zai-max` account plus `zai-max-brim` and `zai-max-accordion`), the plugin
+queries each account with its own key and renders one labeled section per
+account, headed by the auth.json key. Each section shows that account's full
+quota dashboard; a failing account renders a loud error section naming its
+provider id and the failure while every other account still renders.
 
 ### Credential Priority
 
@@ -230,7 +246,7 @@ The plugin discovers credentials in this order:
 1. **OpenCode authentication context** (managed by OpenCode) - PRIMARY
 2. **Environment variable** `ZAI_API_KEY` (Global) or `ZHIPU_API_KEY` (CN) - FALLBACK (dev/testing only)
 
-**Where credentials are read:** OpenCode stores `auth.json` at `~/.local/share/opencode/auth.json` on **all platforms, including Windows**. On Windows the plugin additionally checks the legacy `%LOCALAPPDATA%\opencode\auth.json` location as a fallback, trying the XDG path first so a stale legacy or workaround copy can never override current credentials. Every candidate is probed until one yields a valid key.
+**Where credentials are read:** OpenCode stores `auth.json` at `~/.local/share/opencode/auth.json` on **all platforms, including Windows**. On Windows the plugin additionally checks the legacy `%LOCALAPPDATA%\opencode\auth.json` location as a fallback, trying the XDG path first so a stale legacy or workaround copy can never override current credentials. Every candidate is probed, and within each file EVERY entry whose key is a legacy exact id or starts with `zai-max` becomes a discovered account (first occurrence wins across candidate paths).
 
 ### Time Window
 

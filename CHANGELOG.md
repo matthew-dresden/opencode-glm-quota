@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.5] - 2026-11-21
+
+### Fixed
+
+- discover every zai-max provider account and render labeled per-account sections
+
 ## [2.0.4] - 2026-10-17
 
 ### Fixed
