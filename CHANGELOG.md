@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.6] - 2026-11-22
+
+### Fixed
+
+- generate test TLS material at runtime; remove static key fixtures
+
+### Maintenance
+
+- add secret-scanning enforcement kit (#21)
+
 ## [2.0.5] - 2026-11-21
 
 ### Fixed
