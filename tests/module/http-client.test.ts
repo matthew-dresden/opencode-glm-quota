@@ -1,7 +1,11 @@
 import { describe, test, mock } from 'node:test';
 import * as assert from 'node:assert';
 import * as https from 'node:https';
-import { readFileSync } from 'node:fs';
+import * as crypto from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { makeRequest } from '../../src/api/client.js';
 
 describe('makeRequest', () => {
@@ -10,8 +14,22 @@ describe('makeRequest', () => {
     const url = 'https://api.z.ai/api/monitor/usage/quota/limit';
     const responseBody = { limits: [] };
     
-    const key = readFileSync('tests/fixtures/test-key.pem', 'utf-8');
-    const cert = readFileSync('tests/fixtures/test-cert.pem', 'utf-8');
+    // Generate TLS material at runtime (house rule: no secret-shaped material in the
+    // repo — real credentials come from AWS SSM, test crypto is generated here).
+    const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const tmpDir = mkdtempSync(join(tmpdir(), 'tls-test-'));
+    const keyPath = join(tmpDir, 'k.pem');
+    const certPath = join(tmpDir, 'c.pem');
+    writeFileSync(keyPath, privateKey.export({ type: 'pkcs8', format: 'pem' }), 'utf-8');
+    execFileSync('openssl', [
+      'req', '-x509',
+      '-key', keyPath,
+      '-out', certPath,
+      '-days', '1',
+      '-subj', '/CN=localhost/O=Test',
+    ], { stdio: 'pipe' });
+    const key = readFileSync(keyPath, 'utf-8');
+    const cert = readFileSync(certPath, 'utf-8');
 
     // Start a local HTTPS server with self-signed cert
     const server = https.createServer({ key, cert }, (req, res) => {
@@ -51,6 +69,7 @@ describe('makeRequest', () => {
     } finally {
       https.globalAgent.options.ca = originalCa;
       await new Promise<void>((resolve) => server.close(() => resolve()));
+      rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 });
