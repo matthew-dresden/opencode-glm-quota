@@ -19,6 +19,18 @@ describe('detectPlatform', () => {
     assert.strictEqual(detectPlatform('z-ai'), 'ZAI');
   });
 
+  test('detects ZAI from zai-max (legacy single account)', () => {
+    assert.strictEqual(detectPlatform('zai-max'), 'ZAI');
+  });
+
+  test('detects ZAI from zai-max-brim (renamed multi-account host id)', () => {
+    assert.strictEqual(detectPlatform('zai-max-brim'), 'ZAI');
+  });
+
+  test('detects ZAI from zai-max-accordion (second multi-account host id)', () => {
+    assert.strictEqual(detectPlatform('zai-max-accordion'), 'ZAI');
+  });
+
   test('detects ZAI from z.ai', () => {
     assert.strictEqual(detectPlatform('z.ai'), 'ZAI');
   });

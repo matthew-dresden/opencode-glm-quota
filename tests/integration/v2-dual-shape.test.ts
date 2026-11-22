@@ -8,6 +8,8 @@ import glmQuotaPlugin from '../../src/index.js'
 const require = createRequire(import.meta.url)
 const https = require('node:https') as typeof import('node:https')
 const fs = require('node:fs') as typeof import('node:fs')
+const os = require('node:os') as typeof import('node:os')
+const path = require('node:path') as typeof import('node:path')
 
 // The upstream V1 tool description; both shapes must register the same string.
 const EXPECTED_DESCRIPTION =
@@ -141,9 +143,21 @@ const SUCCESS_RESPONSES: Record<string, MockResponse> = {
 
 async function withEnvToken<T>(fn: () => Promise<T>): Promise<T> {
   process.env.ZAI_API_KEY = 'test-token'
+  // Point HOME at an empty temp dir so discovery deterministically falls back
+  // to the env-var credential under test and never reads the real machine's
+  // auth.json (which may hold any number of accounts).
+  const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'glm-quota-noauth-'))
+  const originalHome = process.env.HOME
+  process.env.HOME = tempHome
   try {
     return await fn()
   } finally {
+    if (originalHome === undefined) {
+      delete process.env.HOME
+    } else {
+      process.env.HOME = originalHome
+    }
+    fs.rmSync(tempHome, { recursive: true, force: true })
     delete process.env.ZAI_API_KEY
   }
 }
@@ -210,9 +224,10 @@ describe('V2 dual-shape plugin export', () => {
   })
 
   test('V2 execute degrades API auth failures to structured content without throwing', async () => {
-    // V1-parity contract: queryAllUsage catches per-endpoint errors (including
-    // 401) and renders the report shell — execute must never throw at the host.
-    // The loud auth-path failure (no credentials at all) is covered below.
+    // v2.0.5 contract: a total API failure for an account renders as a loud
+    // per-account error section naming the provider id, and execute still
+    // never throws at the host. The loud auth-path failure (no credentials
+    // at all) is covered below.
     const { ctx, editor } = createCapturingContext()
     await glmQuotaPlugin.setup(ctx)
 
@@ -227,8 +242,11 @@ describe('V2 dual-shape plugin export', () => {
 
         assert.strictEqual(typeof result, 'object', 'execute must still return structured content on failure')
         assert.strictEqual(typeof result.content, 'string')
-        assert.ok(result.content.includes('### 📊 Z.ai GLM Coding Plan'))
-        assert.ok(result.content.includes('No quota data available'))
+        assert.ok(result.content.startsWith('### ⚠️ '), 'total API failure must render a loud error section')
+        assert.ok(
+          result.content.includes('Account Query Failed: ZAI_API_KEY'),
+          'error section must name the provider id'
+        )
       } finally {
         restore()
       }
