@@ -11,23 +11,30 @@ import { queryEndpoint } from "./api/client.js";
 import { getTimeWindow, getTimeWindowQueryParams } from "./utils/time-window.js";
 import { getAuthFilePathCandidates } from "./utils/auth-path.js";
 import { formatProgressLine } from "./utils/progress-bar.js";
+import { maskKey } from "./utils/key-masking.js";
 import { MAIN_TITLE_PREFIX, ROW_EMOJI, SECTION_HEADERS } from "./utils/markdown-constants.js";
 import { createMarkdownError } from "./utils/error-formatter.js";
 import { FIVE_HOUR_TOKEN_LIMIT_LABEL, getTokenLimitLabel, isFiveHourTokenLimit } from "./utils/token-limits.js";
 // ============================================================================
 // CONSTANTS
 // ============================================================================
-const CANDIDATE_PROVIDER_IDS = [
+// Legacy provider ids from the upstream plugin era, discovered by EXACT
+// auth.json key match (case-sensitive, unchanged behavior).
+const EXACT_PROVIDER_IDS = [
     'zai-coding-plan',
     'zai',
     'z-ai',
     'z.ai',
     'zhipu',
-    'zhipuai',
-    // The v2-migration config defines its Z.ai provider under the id `zai-max`;
-    // detectPlatform() already resolves it to ZAI, so discovery only needs the id.
-    'zai-max'
+    'zhipuai'
 ];
+// The zai-max account family is discovered by PREFIX match: the legacy single
+// account `zai-max` plus every renamed or additional host account
+// (`zai-max-brim`, `zai-max-accordion`, any future `zai-max-*`). Prefix
+// matching keeps discovery working across host config renames without a
+// candidate-list bump. detectPlatform() resolves every `zai-max*` id to ZAI
+// via its existing lower.includes('zai') logic.
+const MULTI_ACCOUNT_PROVIDER_PREFIX = 'zai-max';
 const DEFAULT_TOKEN_LIMIT = 40000000;
 const MCP_LIMIT_LABEL = 'MCP usage(1 Month)';
 const TOKEN_LIMIT_TYPE = 'TOKENS_LIMIT';
@@ -53,47 +60,83 @@ function extractKeyFromEntry(entry) {
     return null;
 }
 /**
- * Get credentials from OpenCode auth.json or environment variables
- * @returns Credentials or null if not found
+ * Check whether an auth.json key belongs to the zai-max account family
+ * (prefix match, case-insensitive). Covers the legacy `zai-max` id and the
+ * renamed or additional host accounts (`zai-max-brim`, `zai-max-accordion`).
+ * @param providerId - The auth.json key under test
+ * @returns True when the key belongs to the zai-max family
  */
-async function getCredentials() {
-    // Priority 1: OpenCode auth.json — probe EVERY candidate path (legacy
-    // LOCALAPPDATA on Windows, then the cross-platform XDG path) so a stale or
-    // partial file at one location does not mask valid credentials at another.
+function isMultiAccountProviderId(providerId) {
+    return providerId.toLowerCase().startsWith(MULTI_ACCOUNT_PROVIDER_PREFIX);
+}
+/**
+ * Check whether an auth.json key is one of the legacy exact candidate ids.
+ * @param providerId - The auth.json key under test
+ * @returns True when the key is a legacy exact candidate
+ */
+function isExactProviderId(providerId) {
+    return EXACT_PROVIDER_IDS.includes(providerId);
+}
+/**
+ * Discover every usable account from OpenCode auth.json or environment
+ * variables.
+ *
+ * Priority 1: auth.json. Every candidate path is probed (legacy LOCALAPPDATA
+ * on Windows, then the cross-platform XDG path). Within a file, EVERY entry
+ * whose key is a legacy exact id or belongs to the zai-max prefix family
+ * becomes an account, so multiple zai-max accounts are discovered
+ * side by side. The quota API is queried once per discovered key. Entries
+ * with no extractable token are not usable accounts and are skipped.
+ *
+ * Priority 2: environment variables (development/testing only), used when
+ * auth.json yielded nothing. The env var name serves as the account label.
+ *
+ * @returns Discovered accounts in auth.json key order (empty when none)
+ */
+function discoverAccounts() {
+    const accounts = [];
+    const seenProviderIds = new Set();
     for (const authPath of getAuthFilePathCandidates()) {
         if (!fs.existsSync(authPath))
             continue;
         try {
             const content = fs.readFileSync(authPath, 'utf-8');
             const authData = JSON.parse(content);
-            for (const providerId of CANDIDATE_PROVIDER_IDS) {
-                const entry = authData[providerId];
-                if (entry) {
-                    const token = extractKeyFromEntry(entry);
-                    if (token) {
-                        const platform = detectPlatform(providerId);
-                        if (platform) {
-                            return { token, platform };
-                        }
-                    }
+            for (const providerId of Object.keys(authData)) {
+                if (seenProviderIds.has(providerId))
+                    continue;
+                if (!isExactProviderId(providerId) && !isMultiAccountProviderId(providerId))
+                    continue;
+                const token = extractKeyFromEntry(authData[providerId]);
+                const platform = detectPlatform(providerId);
+                if (token && platform) {
+                    seenProviderIds.add(providerId);
+                    accounts.push({ providerId, token, platform });
                 }
             }
         }
         catch {
-            // Silent fail, try next candidate / fallback method
+            // Silent fail, try next candidate path
         }
     }
-    // Priority 2: Environment variables (for development/testing)
-    if (process.env.ZAI_API_KEY) {
-        return { token: process.env.ZAI_API_KEY, platform: 'ZAI' };
+    if (accounts.length === 0) {
+        if (process.env.ZAI_API_KEY) {
+            accounts.push({
+                providerId: 'ZAI_API_KEY',
+                token: process.env.ZAI_API_KEY,
+                platform: 'ZAI'
+            });
+        }
+        else if (process.env.ZHIPU_API_KEY || process.env.ZHIPUAI_API_KEY) {
+            const token = (process.env.ZHIPU_API_KEY || process.env.ZHIPUAI_API_KEY);
+            accounts.push({
+                providerId: process.env.ZHIPU_API_KEY ? 'ZHIPU_API_KEY' : 'ZHIPUAI_API_KEY',
+                token,
+                platform: 'ZHIPU'
+            });
+        }
     }
-    if (process.env.ZHIPU_API_KEY || process.env.ZHIPUAI_API_KEY) {
-        return {
-            token: (process.env.ZHIPU_API_KEY || process.env.ZHIPUAI_API_KEY),
-            platform: 'ZHIPU'
-        };
-    }
-    return null;
+    return accounts;
 }
 /**
  * Create error message for missing credentials
@@ -227,13 +270,14 @@ function formatMarkdownTable(headers, separator, rows) {
     const tableRows = rows.map((row) => `| ${row.join(' | ')} |`);
     return [`| ${headers.join(' | ')} |`, `|${separator.join('|')}|`, ...tableRows].join('\n');
 }
-function formatMarkdownHeader(platformName, startTime, endTime, level) {
+function formatMarkdownHeader(accountLabel, platformName, startTime, endTime, level) {
     const title = level
         ? `${MAIN_TITLE_PREFIX}${formatPlanLevel(level)}`
         : '### 📊 Z.ai GLM Coding Plan';
     return [
         title,
         '',
+        `- **Account**: ${accountLabel}`,
         `- **Platform**: ${platformName}`,
         `- **Period**: ${startTime} → ${endTime}`
     ].join('\n');
@@ -325,11 +369,11 @@ function formatToolUsageTable(toolData) {
         .map(([label, count]) => [label, formatNumber(count)]);
     return formatMarkdownTable(['Tool', 'Count'], ['------', '------:'], rows.length > 0 ? rows : [['No tool usage data available', '—']]);
 }
-function formatMarkdownOutput(platform, startTime, endTime, quotaData, modelData, toolData) {
+function formatMarkdownOutput(accountLabel, platform, startTime, endTime, quotaData, modelData, toolData) {
     const platformName = getPlatformName(platform);
     const level = quotaData?.level;
     return [
-        formatMarkdownHeader(platformName, startTime, endTime, level),
+        formatMarkdownHeader(accountLabel, platformName, startTime, endTime, level),
         `${SECTION_HEADERS.QUOTA_LIMITS}\n\n${formatQuotaLimitsTable(quotaData)}`,
         `${SECTION_HEADERS.QUOTA_USAGE}\n\n${formatQuotaUsageTable(quotaData, modelData)}`,
         `${SECTION_HEADERS.MCP_BREAKDOWN}\n\n${formatMcpBreakdownTable(quotaData)}`,
@@ -341,32 +385,50 @@ function formatMarkdownOutput(platform, startTime, endTime, quotaData, modelData
 // MAIN QUERY FUNCTION
 // ============================================================================
 /**
- * Query all usage statistics
- * @param credentials - API credentials
- * @returns Formatted output string
+ * Unwrap a settled endpoint promise into its response data, mapping
+ * rejections to null so a single failed endpoint degrades to an empty
+ * section while the rest of the dashboard still renders.
+ * @param settled - Settled result of one endpoint query
+ * @returns Response data, or null when the endpoint failed
  */
-async function queryAllUsage(credentials) {
-    const { token, platform } = credentials;
+function settledResponseData(settled) {
+    return settled.status === 'fulfilled'
+        ? (settled.value.data ?? settled.value)
+        : null;
+}
+/**
+ * Render one account's usage dashboard.
+ *
+ * All three endpoints are queried once for this account. A partial failure
+ * (some endpoints succeed) degrades per endpoint exactly as before. A total
+ * failure (every endpoint rejected) throws so the caller renders a loud
+ * error section for THIS account without masking the failure behind an
+ * empty-looking dashboard.
+ *
+ * @param account - The discovered account to query
+ * @returns Formatted dashboard markdown for the account
+ */
+async function queryAllUsage(account) {
+    const { providerId, token, platform } = account;
     const endpoints = getEndpoints(platform);
     const { startTime, endTime } = getTimeWindow();
     const queryParams = getTimeWindowQueryParams();
     // Query all endpoints
-    const [quotaResponse, modelResponse, toolResponse] = await Promise.all([
-        queryEndpoint(endpoints, token, 'quotaLimit').catch(() => null),
-        queryEndpoint(endpoints, token, 'modelUsage', queryParams).catch(() => null),
-        queryEndpoint(endpoints, token, 'toolUsage', queryParams).catch(() => null)
+    const [quotaResult, modelResult, toolResult] = await Promise.allSettled([
+        queryEndpoint(endpoints, token, 'quotaLimit'),
+        queryEndpoint(endpoints, token, 'modelUsage', queryParams),
+        queryEndpoint(endpoints, token, 'toolUsage', queryParams)
     ]);
+    // Total failure: surface a loud per-account error (fail fast, no silent skip)
+    if (quotaResult.status === 'rejected' && modelResult.status === 'rejected' && toolResult.status === 'rejected') {
+        throw quotaResult.reason instanceof Error ? quotaResult.reason : new Error(String(quotaResult.reason));
+    }
     // Process responses
-    const quotaData = quotaResponse
-        ? processQuotaLimit(quotaResponse.data)
-        : null;
-    const modelData = modelResponse
-        ? (modelResponse.data || modelResponse)
-        : null;
-    const toolData = toolResponse
-        ? (toolResponse.data || toolResponse)
-        : null;
-    return formatMarkdownOutput(platform, startTime, endTime, quotaData, modelData, toolData);
+    const quotaRawData = settledResponseData(quotaResult);
+    const quotaData = quotaRawData ? processQuotaLimit(quotaRawData) : null;
+    const modelData = settledResponseData(modelResult);
+    const toolData = settledResponseData(toolResult);
+    return formatMarkdownOutput(providerId, platform, startTime, endTime, quotaData, modelData, toolData);
 }
 // ============================================================================
 // PLUGIN ENTRYPOINTS (dual shape)
@@ -376,25 +438,50 @@ async function queryAllUsage(credentials) {
  */
 const GLM_QUOTA_DESCRIPTION = 'Query Z.ai GLM Coding Plan usage statistics including quota limits, model usage, and MCP tool usage';
 /**
- * Run the quota query and return the Markdown summary.
+ * Render one account's section: its dashboard on success, a loud labeled
+ * error section on failure. The error section names the provider id in the
+ * title and identifies the credential via its masked key, so one account's
+ * failure never leaks into or silences another account's section.
+ *
+ * @param account - The discovered account to render
+ * @param multi - True when more than one account was discovered; adds a
+ *   `## <provider-id>` heading so sections are clearly separated
+ * @returns The account's markdown section
+ */
+async function renderAccountSection(account, multi) {
+    let content;
+    try {
+        content = await queryAllUsage(account);
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        content = createMarkdownError(`Account Query Failed: ${account.providerId}`, { Key: maskKey(account.token) }, message);
+    }
+    return multi ? `## ${account.providerId}\n\n${content}` : content;
+}
+/**
+ * Run the quota query across every discovered account and return the
+ * Markdown output.
  *
  * Single quota-fetch path shared by the V1 and V2 registrations. Guards per
- * the ratified amendment 9 discipline: non-essential failures (network, API,
- * rendering) are caught and returned as loud Markdown error content — never
- * thrown at the host — while the missing-credentials outcome is the explicit
- * "Credentials Not Found" error content with setup instructions (loud, not
- * swallowed). Credential discovery itself (auth.json candidates → env vars)
- * is unchanged from V1.
+ * the ratified amendment 9 discipline: failures are returned as loud
+ * Markdown content, never thrown at the host. Every auth.json account in the
+ * zai-max family (plus the legacy exact ids) is queried once and rendered as
+ * its own labeled section; per-account API failures are isolated so a broken
+ * account cannot mask a healthy one. The zero-accounts outcome is the
+ * explicit "Credentials Not Found" error content with setup instructions.
  *
  * @returns Markdown quota summary or Markdown error message
  */
 async function runQuotaQuery() {
     try {
-        const credentials = await getCredentials();
-        if (!credentials) {
+        const accounts = discoverAccounts();
+        if (accounts.length === 0) {
             return createCredentialError();
         }
-        return await queryAllUsage(credentials);
+        const multi = accounts.length > 1;
+        const sections = await Promise.all(accounts.map((account) => renderAccountSection(account, multi)));
+        return sections.join('\n\n');
     }
     catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
