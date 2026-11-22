@@ -1,8 +1,36 @@
 import { describe, test, mock } from 'node:test';
 import * as assert from 'node:assert';
 import * as https from 'node:https';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { makeRequest } from '../../src/api/client.js';
+
+// House rule (opencode-estate SPEC C3): test crypto material is generated at
+// runtime and never stored in the repository.
+function generateTestCert(): { key: string; cert: string } {
+  const dir = mkdtempSync(join(tmpdir(), 'https-test-'));
+  try {
+    const keyPath = join(dir, 'key.pem');
+    const certPath = join(dir, 'cert.pem');
+    execFileSync(
+      'openssl',
+      [
+        'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
+        '-keyout', keyPath, '-out', certPath,
+        '-days', '1', '-subj', '/CN=localhost',
+      ],
+      { stdio: 'ignore' }
+    );
+    return {
+      key: readFileSync(keyPath, 'utf-8'),
+      cert: readFileSync(certPath, 'utf-8'),
+    };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 describe('makeRequest', () => {
   test('sends auth header and parses JSON response', async () => {
@@ -10,8 +38,7 @@ describe('makeRequest', () => {
     const url = 'https://api.z.ai/api/monitor/usage/quota/limit';
     const responseBody = { limits: [] };
     
-    const key = readFileSync('tests/fixtures/test-key.pem', 'utf-8');
-    const cert = readFileSync('tests/fixtures/test-cert.pem', 'utf-8');
+    const { key, cert } = generateTestCert();
 
     // Start a local HTTPS server with self-signed cert
     const server = https.createServer({ key, cert }, (req, res) => {
