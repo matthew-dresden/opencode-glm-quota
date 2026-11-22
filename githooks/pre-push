@@ -1,0 +1,29 @@
+#!/bin/bash
+# pre-push hook: gitleaks full scan of repository history.
+# Rejects the push when any commit in history matches a secret rule.
+#
+# Remediation: real credentials come from AWS SSM Parameter Store /
+# Secrets Manager at runtime; test crypto material and dummy tokens are
+# generated at runtime and never stored in the tree.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+GITLEAKS="$(command -v gitleaks || true)"
+if [ -z "$GITLEAKS" ]; then
+  if [ -x "$HOME/.local/bin/gitleaks" ]; then
+    GITLEAKS="$HOME/.local/bin/gitleaks"
+  else
+    echo "ERROR: gitleaks not found on PATH or at \$HOME/.local/bin/gitleaks." >&2
+    echo "Install gitleaks 8.30.1 from https://github.com/gitleaks/gitleaks/releases," >&2
+    echo "then re-run the push." >&2
+    exit 1
+  fi
+fi
+
+if ! "$GITLEAKS" detect --config .gitleaks.toml --redact; then
+  echo "ERROR: gitleaks findings in repository history; push rejected." >&2
+  echo "Remediation: fetch real secrets at runtime from AWS SSM Parameter Store or" >&2
+  echo "Secrets Manager; generate test material at runtime; purge the finding" >&2
+  echo "from history before pushing." >&2
+  exit 1
+fi

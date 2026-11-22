@@ -19,7 +19,8 @@
     "test:coverage": "c8 --reporter=lcov --reporter=text -- npm test",
     "lint": "eslint src/",
     "check:tarball": "node scripts/check-tarball.mjs",
-    "check:license": "node scripts/check-license.mjs"
+    "check:license": "node scripts/check-license.mjs",
+    "prepare": "bash scripts/security/install-hooks.sh"
   },
   "keywords": [
     "opencode",
