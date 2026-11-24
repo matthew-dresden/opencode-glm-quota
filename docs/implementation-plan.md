@@ -490,8 +490,7 @@ Package includes an installer command that copies `/integration/` files from npm
 - `tests/fixtures/api-error-403.json`
 - `tests/fixtures/api-error-429.json`
 - `tests/fixtures/api-error-500.json`
-- `tests/fixtures/test-key.pem`
-- `tests/fixtures/test-cert.pem`
+- TLS test material: generated at test runtime (`openssl req -x509`, SPEC C3); no stored key/cert fixtures
 
 **Files to Modify:**
 - `src/api/client.ts` - Add timeout, categorize errors, sanitize tokens
