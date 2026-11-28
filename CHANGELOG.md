@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.0] - 2026-11-28
+
+### Added
+
+- promote opencode-glm-quota-mac-dev dev main to production main (the 2026-11-28 wave) (#24)
+
+### Fixed
+
+- generate dummy tokens at runtime in sanitization tests
+- generate test TLS material at runtime; remove static key fixtures
+
+### Maintenance
+
+- add secret-scanning enforcement kit (#21)
+
 ## [2.0.5] - 2026-11-21
 
 ### Fixed
