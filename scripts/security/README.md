@@ -1,7 +1,16 @@
+# Secret enforcement kit
+
+- Hooks live in `githooks/` (standard kit layout); `install-hooks.sh` sets
+  `core.hooksPath=githooks`, failing fast if gitleaks is missing (skipped in CI).
+- `pre-commit` runs `gitleaks protect --staged`; `pre-push` runs a full
+  `gitleaks detect` over history; both exit 1 on findings.
+- Remediation: real secrets from AWS SSM at runtime; test material generated
+  at runtime; CI mirror in `.github/workflows/security.yml`.
+
+## Production repo
+
 # Security kit
-
 Enforces the house rule: no secret-shaped material (real, test, or synthetic) in code or git history, ever. Real credentials are fetched from AWS SSM at runtime; test crypto material is generated at runtime.
-
 - Install: `scripts/security/install-hooks.sh` (requires gitleaks on PATH).
 - `githooks/pre-commit` scans staged changes; `githooks/pre-push` scans full history.
 - CI (`.github/workflows/security.yml`) runs `gitleaks detect` on every push and PR (gitleaks pinned to v8.30.1).
