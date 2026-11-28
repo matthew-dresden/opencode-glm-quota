@@ -1,12 +1,36 @@
 import { describe, test, mock } from 'node:test';
 import * as assert from 'node:assert';
 import * as https from 'node:https';
-import * as crypto from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { makeRequest } from '../../src/api/client.js';
+
+// House rule (opencode-estate SPEC C3): test crypto material is generated at
+// runtime and never stored in the repository.
+function generateTestCert(): { key: string; cert: string } {
+  const dir = mkdtempSync(join(tmpdir(), 'https-test-'));
+  try {
+    const keyPath = join(dir, 'key.pem');
+    const certPath = join(dir, 'cert.pem');
+    execFileSync(
+      'openssl',
+      [
+        'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
+        '-keyout', keyPath, '-out', certPath,
+        '-days', '1', '-subj', '/CN=localhost',
+      ],
+      { stdio: 'ignore' }
+    );
+    return {
+      key: readFileSync(keyPath, 'utf-8'),
+      cert: readFileSync(certPath, 'utf-8'),
+    };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 describe('makeRequest', () => {
   test('sends auth header and parses JSON response', async () => {
@@ -14,22 +38,7 @@ describe('makeRequest', () => {
     const url = 'https://api.z.ai/api/monitor/usage/quota/limit';
     const responseBody = { limits: [] };
     
-    // Generate TLS material at runtime (house rule: no secret-shaped material in the
-    // repo — real credentials come from AWS SSM, test crypto is generated here).
-    const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-    const tmpDir = mkdtempSync(join(tmpdir(), 'tls-test-'));
-    const keyPath = join(tmpDir, 'k.pem');
-    const certPath = join(tmpDir, 'c.pem');
-    writeFileSync(keyPath, privateKey.export({ type: 'pkcs8', format: 'pem' }), 'utf-8');
-    execFileSync('openssl', [
-      'req', '-x509',
-      '-key', keyPath,
-      '-out', certPath,
-      '-days', '1',
-      '-subj', '/CN=localhost/O=Test',
-    ], { stdio: 'pipe' });
-    const key = readFileSync(keyPath, 'utf-8');
-    const cert = readFileSync(certPath, 'utf-8');
+    const { key, cert } = generateTestCert();
 
     // Start a local HTTPS server with self-signed cert
     const server = https.createServer({ key, cert }, (req, res) => {
@@ -69,7 +78,6 @@ describe('makeRequest', () => {
     } finally {
       https.globalAgent.options.ca = originalCa;
       await new Promise<void>((resolve) => server.close(() => resolve()));
-      rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 });

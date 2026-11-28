@@ -1,27 +1,29 @@
-#!/bin/sh
-# House rule: no secret-shaped material (real, test, or synthetic) in code or
-# history, ever. Real credentials come from AWS SSM at runtime. Test crypto
-# material is generated at runtime.
-set -e
+#!/bin/bash
+# pre-commit hook: gitleaks scan of staged changes.
+# Rejects the commit when staged content matches any secret rule.
+#
+# Remediation: real credentials come from AWS SSM Parameter Store /
+# Secrets Manager at runtime; test crypto material and dummy tokens are
+# generated at runtime and never stored in the tree.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
 
-if ! command -v gitleaks >/dev/null 2>&1; then
-  echo "gitleaks is not on PATH. Install it (e.g. 'brew install gitleaks'), then retry." >&2
-  exit 1
+GITLEAKS="$(command -v gitleaks || true)"
+if [ -z "$GITLEAKS" ]; then
+  if [ -x "$HOME/.local/bin/gitleaks" ]; then
+    GITLEAKS="$HOME/.local/bin/gitleaks"
+  else
+    echo "ERROR: gitleaks not found on PATH or at \$HOME/.local/bin/gitleaks." >&2
+    echo "Install gitleaks 8.30.1 from https://github.com/gitleaks/gitleaks/releases," >&2
+    echo "then re-run the commit." >&2
+    exit 1
+  fi
 fi
 
-if ! gitleaks protect --staged --redact -v; then
-  cat >&2 <<'MSG'
-
-SECRET-SHAPED MATERIAL DETECTED IN STAGED CHANGES — COMMIT BLOCKED.
-Remediation:
-  - Remove the material from this change. Never commit keys, tokens, or
-    credentials — real, test, or synthetic.
-  - Real credentials: fetch from AWS SSM Parameter Store / Secrets Manager at
-    runtime.
-  - Test crypto material: generate at runtime inside the test (see
-    tests/module/http-client.test.ts for the generate-at-runtime pattern).
-  - If material already landed in history, history must be rewritten
-    (git filter-repo); see scripts/security/README.md.
-MSG
+if ! "$GITLEAKS" protect --staged --config .gitleaks.toml --redact -v; then
+  echo "ERROR: gitleaks findings in staged changes; commit rejected." >&2
+  echo "Remediation: fetch real secrets at runtime from AWS SSM Parameter Store or" >&2
+  echo "Secrets Manager; generate test crypto material at runtime; remove the" >&2
+  echo "secret-shaped content and re-commit." >&2
   exit 1
 fi

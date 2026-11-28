@@ -1,13 +1,16 @@
-# House rule: No secret-shaped material (real, test, or synthetic) in code or
-# history, ever. Real credentials come from AWS SSM at runtime. Test crypto
-# material is generated at runtime.
+# opencode-estate house rule (SPEC C3): NO secret-shaped material — real, test,
+# or synthetic — in any tree or git history, ever.
+#   - Real credentials come from AWS SSM Parameter Store / Secrets Manager at runtime.
+#   - Test crypto material and dummy tokens are generated at runtime, never stored.
+# This gate config is enforced on every scan of this repository.
 
 [extend]
 useDefault = true
 
+# House rule: flag any PEM private-key block in code or history.
 [[rules]]
 id = "pem-private-key-block"
+description = "PEM Private Key Block"
 title = "PEM Private Key Block"
-description = "House rule: no secret-shaped material (real, test, or synthetic) in code or history, ever. Real credentials come from AWS SSM at runtime. Test crypto material is generated at runtime. Any PEM private key block is rejected."
-regex = '''-----BEGIN [A-Z ]*PRIVATE KEY-----'''
 tags = ["key", "pem", "private"]
+regex = '''-----BEGIN [A-Z ]*PRIVATE KEY-----'''

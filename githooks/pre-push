@@ -1,24 +1,29 @@
-#!/bin/sh
-# House rule: no secret-shaped material (real, test, or synthetic) in code or
-# history, ever. Real credentials come from AWS SSM at runtime. Test crypto
-# material is generated at runtime.
-set -e
+#!/bin/bash
+# pre-push hook: gitleaks full scan of repository history.
+# Rejects the push when any commit in history matches a secret rule.
+#
+# Remediation: real credentials come from AWS SSM Parameter Store /
+# Secrets Manager at runtime; test crypto material and dummy tokens are
+# generated at runtime and never stored in the tree.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
 
-if ! command -v gitleaks >/dev/null 2>&1; then
-  echo "gitleaks is not on PATH. Install it (e.g. 'brew install gitleaks'), then retry." >&2
-  exit 1
+GITLEAKS="$(command -v gitleaks || true)"
+if [ -z "$GITLEAKS" ]; then
+  if [ -x "$HOME/.local/bin/gitleaks" ]; then
+    GITLEAKS="$HOME/.local/bin/gitleaks"
+  else
+    echo "ERROR: gitleaks not found on PATH or at \$HOME/.local/bin/gitleaks." >&2
+    echo "Install gitleaks 8.30.1 from https://github.com/gitleaks/gitleaks/releases," >&2
+    echo "then re-run the push." >&2
+    exit 1
+  fi
 fi
 
-if ! gitleaks detect --redact -v; then
-  cat >&2 <<'MSG'
-
-SECRET-SHAPED MATERIAL FOUND IN REPO HISTORY — PUSH BLOCKED.
-Remediation:
-  - Purge the material from history (git filter-repo) and force-push rewritten
-    refs; see scripts/security/README.md.
-  - Never reintroduce keys, tokens, or credentials — real, test, or synthetic.
-    Use AWS SSM at runtime for real credentials and runtime generation for
-    test crypto material.
-MSG
+if ! "$GITLEAKS" detect --config .gitleaks.toml --redact; then
+  echo "ERROR: gitleaks findings in repository history; push rejected." >&2
+  echo "Remediation: fetch real secrets at runtime from AWS SSM Parameter Store or" >&2
+  echo "Secrets Manager; generate test material at runtime; purge the finding" >&2
+  echo "from history before pushing." >&2
   exit 1
 fi
